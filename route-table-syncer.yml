@@ -1,0 +1,67 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: route-table-syncer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: XOXO_RELEASE-ingress-azure
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: XOXO_NAMESPACE
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: route-table-syncer
+  namespace: XOXO_NAMESPACE
+  labels:
+    component: route-table-syncer
+    role: infrastructure
+spec:
+  selector:
+    matchLabels:
+      component: route-table-syncer
+      role: infrastructure
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        aadpodidbinding: XOXO_RELEASE-ingress-azure
+        component: route-table-syncer
+        role: infrastructure
+    spec:
+      nodeSelector:
+        agentpool: infra
+      tolerations:
+        - key: pool
+          operator: Equal
+          value: infra
+      initContainers:
+        - name: volume-mount-hack
+          image: busybox
+          command: ["sh", "-c", "chmod -R a+r /etc/kubernetes"]
+          volumeMounts:
+            - mountPath: /etc/kubernetes
+              name: azure
+      containers:
+        - name: route-table-syncer
+          securityContext:
+            privileged: false
+          image: "XOXO_ACR.azurecr.io/route-table-syncer:XOXO_TAG"
+          args:
+            - -local=false
+          resources:
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          volumeMounts:
+            - mountPath: /etc/kubernetes/
+              name: azure
+              readOnly: true
+      volumes:
+        - name: azure
+          hostPath:
+            path: /etc/kubernetes/
+            type: Directory
