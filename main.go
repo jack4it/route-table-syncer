@@ -173,6 +173,7 @@ func main() {
 	}
 	select {}
 }
+
 func reconcile() error {
 	src, err := getTable(cpc.RouteTableResourceGroup, cpc.RouteTableName)
 	if err != nil {
